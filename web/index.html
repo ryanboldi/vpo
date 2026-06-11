@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Vector Policy Optimization</title>
+<meta name="description" content="VPO: an RL algorithm that trains policies for diversity instead of a single best answer, improving test-time search. A drop-in replacement for GRPO.">
+<meta property="og:title" content="Vector Policy Optimization: Training for Diversity Improves Test-Time Search">
+<meta property="og:description" content="VPO trains policies to produce diverse solution sets, improving test-time search over scalar RL.">
+<meta property="og:type" content="website">
+<meta property="og:image" content="static/figs/teaser.png">
+<link rel="stylesheet" href="https://latex.now.sh/style.css">
+<link rel="stylesheet" href="static/style.css">
+<script>
+  window.MathJax = { tex: { inlineMath: [['\\(', '\\)']], displayMath: [['$$', '$$']] }, svg: { fontCache: 'global' } };
+</script>
+<script async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+</head>
+<body>
+
+<header class="paper">
+  <h1>Vector Policy Optimization</h1>
+  <p class="subtitle">Training for Diversity Improves Test-Time Search</p>
+
+  <p class="authors">
+    Ryan Bahlous-Boldi<sup>1,2</sup>,
+    Isha Puri<sup>2</sup>,
+    Idan Shenfeld<sup>1,2</sup>,
+    Akarsh Kumar<sup>2</sup>,
+    Mehul Damani<sup>2</sup>,<br>
+    Sebastian Risi<sup>4</sup>,
+    Omar Khattab<sup>2</sup>,
+    Zhang-Wei Hong<sup>1,2,3</sup>,
+    Pulkit Agrawal<sup>1,2</sup>
+  </p>
+  <p class="affil">
+    <sup>1</sup>Improbable AI Lab &nbsp; <sup>2</sup>MIT &nbsp;
+    <sup>3</sup>MIT-IBM Computing Research Lab &nbsp; <sup>4</sup>Sakana AI
+  </p>
+  <p class="links">
+    [ <a href="https://arxiv.org/abs/2605.22817">arXiv</a> ]
+    [ <a href="https://github.com/ryanboldi/vpo">Code</a> ]
+    [ <a href="https://github.com/ryanboldi/vpo/tree/main/notebooks">Colab</a> ]
+    [ <a href="#bibtex">BibTeX</a> ]
+  </p>
+</header>
+
+<h2>Abstract</h2>
+<p>
+  Language models must now generalize out of the box to novel environments and work inside
+  inference-scaling search procedures, such as AlphaEvolve, that select rollouts with a variety of
+  task-specific reward functions. Unfortunately, the standard paradigm of LLM post-training optimizes
+  a pre-specified scalar reward, often leading current LLMs to produce low-entropy response
+  distributions and thus to struggle at displaying the diversity that inference-time search will
+  require. We propose <strong>Vector Policy Optimization (VPO)</strong>, an RL algorithm that
+  explicitly trains policies to anticipate diverse downstream reward functions and to produce diverse
+  solutions. VPO exploits that rewards are often vector-valued in practice, like per-test-case
+  correctness in code generation or multiple different user personas or reward models. VPO is
+  essentially a drop-in replacement for the GRPO advantage estimator, but it trains the LLM to output
+  a <em>set</em> of solutions where individual solutions specialize to different trade-offs in the
+  vector reward space. Across four tasks, VPO matches or beats the strongest scalar RL baselines on
+  test-time search (e.g. pass@<em>k</em> and best@<em>k</em>), with the gap widening as the search
+  budget grows. For evolutionary search, VPO models unlock problems that GRPO models cannot solve at
+  all. As test-time search becomes more standardized, optimizing for diversity may need to become the
+  default post-training objective.
+</p>
+
+<figure>
+  <img src="static/figs/teaser.png" alt="VPO vs GRPO: VPO spreads candidates across the Pareto frontier, improving LiveCodeBench pass@k and solving search problems GRPO cannot.">
+  <figcaption>
+    <strong>Figure 1.</strong> When maximizing a scalar, GRPO sends every rollout toward the same
+    point. VPO simultaneously optimizes across different reward weightings, spreading candidates
+    across the frontier of good solutions. On LiveCodeBench this yields higher pass@<em>k</em>, and
+    inside an AlphaEvolve-style search loop VPO cracks hard problems GRPO never solves.
+  </figcaption>
+</figure>
+
+<h2>1. The problem: scalar rewards collapse diversity</h2>
+<p>
+  Modern LLM pipelines pair a learned policy with explicit <u>test-time search</u><label for="sn-tts" class="sidenote-toggle sidenote-number"></label><input type="checkbox" id="sn-tts" class="sidenote-toggle" /><span class="sidenote">Any procedure that draws several candidate solutions from the model and then selects among them: best-of-\(n\), self-consistency, verifier reranking, or evolutionary loops like AlphaEvolve and FunSearch.</span>: rejection sampling with
+  a verifier, best-of-<em>n</em>, evolutionary methods like AlphaEvolve, or agents that plan and
+  backtrack. In all of them, search picks from a pool of candidates the policy generates, so
+  <u>the diversity of that pool sets a ceiling</u> on how well search can do.
+</p>
+<p>
+  Standard RL post-training works against that. Policy-gradient methods like GRPO drive the model
+  toward a narrow set of high-probability responses, so after training the extra samples are
+  near-duplicates<label for="sn-collapse" class="sidenote-toggle sidenote-number"></label><input type="checkbox" id="sn-collapse" class="sidenote-toggle" /><span class="sidenote">This is the well-documented entropy / mode collapse of RL post-training: KL-regularised policy gradients sharpen the output distribution, so pass@\(k\) at large \(k\) often <em>degrades</em> relative to the base model even as pass@1 improves.</span>. That collapse is exactly what makes downstream search ineffective. VPO reframes the
+  job of post-training: the goal is not to converge on the single best response, but to maximize the
+  diversity of a set of competent solutions, leaving exploitation entirely to search. A clean division
+  of labor: <u>training explores, search exploits</u>.
+</p>
+
+<h2>2. The idea: keep the reward a vector</h2>
+<p>
+  In most real tasks the reward is already a <strong>vector</strong> \(r(x,y)=[r_1,\dots,r_d]\) of
+  sub-scores that we choose to sum up: per-test-case correctness in code, per-criterion ratings in
+  RLHF, per-sub-question success in multi-hop reasoning, or the format / tool-name / argument fields
+  in tool use. Scalar RL throws this structure away by fixing a single weighting \(w^\star\) and
+  optimizing \(w^{\star\top} r\). Every answer is judged on one axis, so the policy has no reason to
+  keep an answer that is excellent on \(r_2\) but mediocre on \(r_1\), exactly the answers search
+  needs.
+</p>
+<p>
+  VPO <u>keeps the reward a vector</u>. Any weighting \(w\in\Delta^{d-1}\) on the simplex<label for="sn-simplex" class="sidenote-toggle sidenote-number"></label><input type="checkbox" id="sn-simplex" class="sidenote-toggle" /><span class="sidenote">The \((d{-}1)\)-simplex \(\Delta^{d-1}\) is the set of non-negative weight vectors that sum to 1, i.e. every convex combination of the objectives. Each point is one "user preference" over the reward components.</span> defines a valid
+  scalar goal \(w^\top r\); VPO refuses to commit to one and instead asks the model for a <em>set</em>
+  of \(m\) answers, rewarding the set for doing well under <em>many</em> weightings at once.
+</p>
+
+<h2>3. The VPO objective</h2>
+<p>
+  For a sampled weighting \(w\), VPO scores not the average answer but the <strong>best</strong> one,
+  \(\max_{y\in S} w^\top r(x,y)\)<label for="sn-max" class="sidenote-toggle sidenote-number"></label><input type="checkbox" id="sn-max" class="sidenote-toggle" /><span class="sidenote">The \(\max\) is what makes this a coverage objective rather than an averaging one. Averaging the set would just reward each answer to be individually good under the mean weighting, recovering scalar RL. Taking the max instead rewards the set for containing a specialist for each \(w\): it is exactly the expected best-of-\(m\) the downstream search will enjoy.</span>, and averages that best-of-set over a distribution of weightings:
+</p>
+$$R(S) \;=\; \mathbb{E}_{w\sim\mathrm{Dir}(\alpha)}\Big[\max_{y\in S} w^\top r(x,y)\Big].$$
+<p>
+  The \(\max\) inside the expectation is the whole trick. A set gets credit only for its best member
+  under each weighting, so the way to score highly is to have a different member be best for different
+  weightings. Near-duplicates cover a narrow slice of the simplex; a set that spreads across
+  trade-offs covers all of it. The objective <u>rewards coverage of the reward space</u>, which is precisely
+  the diversity downstream search exploits.
+</p>
+<h2>4. The algorithm</h2>
+<p>
+  Drop that set-level reward into GRPO and you have VPO. In practice \(R(S)\) is a Monte-Carlo
+  estimate: draw \(K\) weights once and share them across the GRPO group of \(G\) rollouts, so every
+  set is scored under the same weightings and the advantages stay comparable:
+</p>
+$$\hat{R}\big(S^{(g)}\big) \;=\; \frac{1}{K}\sum_{k=1}^{K}\,\max_{s\in S^{(g)}} w^{(k)\top} r(x,s),
+  \qquad w^{(1)},\dots,w^{(K)}\stackrel{\text{iid}}{\sim}\mathrm{Dir}(\mathbf{1}).$$
+<p>
+  The model emits all \(m\) answers in one autoregressive rollout (a shared reasoning prefix, then the
+  answers), so it can condition each answer on the previous ones and deliberately diversify. The
+  scalar \(\hat R\) replaces the usual per-rollout reward; the GRPO advantage is computed and applied
+  to every token as normal. Two knobs: the weight sampler (i.i.d. Dirichlet, or a Sobol quasi-Monte-Carlo
+  sampler with lower variance<label for="sn-sobol" class="sidenote-toggle sidenote-number"></label><input type="checkbox" id="sn-sobol" class="sidenote-toggle" /><span class="sidenote">Sharing the \(K\) weight draws across the whole group already removes the between-rollout noise. The Sobol (low-discrepancy) sampler additionally spreads the \(K\) weights more evenly over the simplex than i.i.d. draws, cutting the variance of \(\hat R\) for the same \(K\).</span>) and the concentration \(\alpha\) (\(\alpha=\mathbf{1}\) is uniform). In
+  code it is a 3-file patch to <a href="https://github.com/volcengine/verl">veRL</a>:
+  <code>algorithm.adv_estimator=grpo</code> becomes <code>vpo</code>.
+</p>
+<figure>
+  <img src="static/figs/method.png" alt="VPO method diagram: a shared reasoning prefix produces m answers, each scored as a reward vector; weight vectors are sampled from a Dirichlet, and the mean best-of-m under each weighting becomes the rollout reward.">
+  <figcaption>
+    <strong>Figure 2.</strong> How a VPO rollout is scored. From prompt \(x\) the model writes \(m\)
+    answers in one chain; each gets a reward vector. We sample many weightings
+    \(w\sim\mathrm{Dir}(\mathbf 1)\), take the best-of-\(m\) under each, and average into the set-level
+    reward \(\hat R\).
+  </figcaption>
+</figure>
+
+<h2>5. Results</h2>
+<p>
+  Across four domains, VPO matches or beats the strongest scalar RL baselines on test-time search
+  (best@<em>k</em><label for="sn-bestk" class="sidenote-toggle sidenote-number"></label><input type="checkbox" id="sn-bestk" class="sidenote-toggle" /><span class="sidenote">best@\(k\) = the highest eval-scalar score among \(k\) sampled candidates; pass@\(k\) = the fraction of problems where at least one of \(k\) candidates is correct. Both reward a diverse pool: they only improve if the extra samples differ.</span>), and <u>the gap widens with the search budget</u>. VPO can lose at <em>k</em>=1 but wins
+  once you sample more than once, the regime where search sits downstream.
+</p>
+<table>
+  <caption>
+    best@30 on the GRPO training scalar, and reward-space diversity (higher = more coverage).
+    <em>m</em>=3 throughout; 4 eval seeds on EUREQA and ToolRL.
+  </caption>
+  <thead>
+    <tr><th>Domain (model)</th><th>GRPO</th><th>Max-at-K</th><th>Multi-RLVR</th><th>VPO</th><th>diversity (GRPO &rarr; VPO)</th></tr>
+  </thead>
+  <tbody>
+    <tr><td>Maze (Qwen3-4B, k=4)</td><td>0.432</td><td>0.577</td><td>0.436</td><td><strong>0.593</strong></td><td>0.003 &rarr; 1.01</td></tr>
+    <tr><td>MuSiQue (Qwen3-1.7B, k=5)</td><td>0.728</td><td>0.802</td><td>0.633</td><td><strong>0.832</strong></td><td>0.054 &rarr; 0.59</td></tr>
+    <tr><td>EUREQA (Qwen3-8B, k=5)</td><td>0.236</td><td>0.237</td><td>0.267</td><td><strong>0.279</strong></td><td>0.119 &rarr; 0.51</td></tr>
+    <tr><td>ToolRL (Qwen3-1.7B, k=4)</td><td>0.925</td><td><strong>0.954</strong></td><td>0.905</td><td>0.952</td><td>0.044 &rarr; 1.30</td></tr>
+  </tbody>
+</table>
+<p>
+  On ToolRL everything saturates near the reward ceiling, so VPO ties Max-at-K (0.952 vs 0.954) while
+  producing about 10&times; the candidate diversity. Where the Pareto front is genuinely wide (Maze,
+  MuSiQue, EUREQA), VPO is the top performer.
+</p>
+<figure>
+  <img src="static/figs/lcb_results.png" alt="LiveCodeBench: pass@k and best@k over k, and pass@k/best@k over OpenEvolve search iterations.">
+  <figcaption>
+    <strong>Figure 3.</strong> LiveCodeBench case study (Qwen2.5-Coder-7B, trained on DeepCoder).
+    (A) Pass@<em>k</em> on the 279-problem held-out split: at <em>k</em>=1 GRPO is ahead, VPO overtakes
+    as <em>k</em> grows. (B) Best@<em>k</em>: VPO above GRPO at every <em>k</em>, gap widening.
+    (C, D) Inside the OpenEvolve search loop on the 32 hardest held-out problems (both methods score 0
+    at best@30 in the standard regime), VPO keeps finding solutions over 200 iterations and cracks
+    problems neither could touch; GRPO plateaus early.
+  </figcaption>
+</figure>
+<figure>
+  <img src="static/figs/diversity.png" alt="Pairwise L1 distance between per-rollout reward vectors over training; VPO sustains higher diversity than Multi-RLVR.">
+  <figcaption>
+    <strong>Figure 4.</strong> Reward-space diversity over training: pairwise \(L_1\) distance between
+    per-rollout reward vectors. VPO sustains much higher diversity than Multi-RLVR throughout. The one
+    domain where Multi-RLVR keeps up (EUREQA) is also the only one where it comes close on best@<em>k</em>.
+  </figcaption>
+</figure>
+
+<h2>6. Relation to prior work</h2>
+<p>
+  <strong>Temperature sampling</strong> adds undirected token-level noise and degrades quality; VPO
+  produces directed diversity in reward space. <strong>Multi-objective RL</strong> conditions a policy
+  on a weight vector to trace the Pareto front, one policy per preference; VPO never conditions on a
+  weight, and its goal is performance under a fixed \(w^\star\) using a single unconditional policy.
+  <strong>GDPO</strong> is single-solution against a vector reward; VPO is multi-solution.
+  <strong>Multi-RLVR</strong> samples multiple answers but collapses the vector to a scalar before
+  scoring, so its pool still drifts toward duplicates. VPO is for the regime where the reward genuinely
+  decomposes and search is downstream; when the reward components are near-collinear it reduces to
+  ordinary scalar RL<label for="sn-collinear" class="sidenote-toggle sidenote-number"></label><input type="checkbox" id="sn-collinear" class="sidenote-toggle" /><span class="sidenote">Concretely, on UltraFeedback scored by a near-collinear ArmoRM reward the simplex effectively collapses to a line, and VPO lands slightly below scalar baselines on absolute best@\(k\), while still retaining the largest per-\(k\) headroom of any method.</span>.
+</p>
+
+<h2>Getting started</h2>
+<pre><code>git clone https://github.com/ryanboldi/vpo.git &amp;&amp; cd vpo
+uv venv .venv &amp;&amp; source .venv/bin/activate
+cd verl &amp;&amp; pip install -e . &amp;&amp; cd .. &amp;&amp; pip install -e .
+
+python data/preprocess_maze.py --local_save_dir $HOME/data/maze
+bash train_vpo.sh TASK=maze MODEL=Qwen/Qwen3-4B</code></pre>
+
+<h2 id="bibtex">BibTeX</h2>
+<pre><code>@article{bahlousboldi2026vpo,
+  title  = {Vector Policy Optimization: Training for Diversity
+            Improves Test-Time Search},
+  author = {Bahlous-Boldi, Ryan and Puri, Isha and Shenfeld, Idan
+            and Kumar, Akarsh and Damani, Mehul and Risi, Sebastian
+            and Khattab, Omar and Hong, Zhang-Wei and Agrawal, Pulkit},
+  journal = {arXiv preprint arXiv:2605.22817},
+  year   = {2026}
+}</code></pre>
+
+<footer>
+  <p><small>Code released under Apache 2.0.
+  <a href="https://github.com/ryanboldi/vpo">github.com/ryanboldi/vpo</a></small></p>
+</footer>
+
+</body>
+</html>

@@ -1,0 +1,16 @@
+# Upstream veRL pin
+#
+# The vendored copy under verl/ is volcengine/verl at the commit below
+# (version 0.8.0.dev) with the 3-file VPO patch applied directly in-tree.
+# The patch is documented in the README section "VPO is a 3-file patch to veRL".
+#
+# To re-derive the unpatched base from upstream:
+#
+#   git clone https://github.com/volcengine/verl.git
+#   cd verl && git checkout d5c5daa84290b445f071fb812a1731a7325f350f
+#   # then apply the 3 file edits shown in the README.
+#
+# This SHA was the HEAD of volcengine/verl `main` (2026-04-03) when the fork was
+# vendored (2026-04-06); verified by version (0.8.0.dev) and file-content match.
+
+SHA: d5c5daa84290b445f071fb812a1731a7325f350f

@@ -1,0 +1,93 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# VPO .gitignore
+#
+# Note: verl/ is VENDORED SOURCE that ships with this repo — it is NOT ignored.
+# Only verl's own build/runtime artifacts (caches, *.egg-info, run outputs) are
+# excluded by the generic patterns below.
+# ─────────────────────────────────────────────────────────────────────────────
+
+# ── Python ──────────────────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# ── Packaging / build artifacts ───────────────────────────────────────────────
+build/
+dist/
+develop-eggs/
+.eggs/
+eggs/
+sdist/
+wheels/
+*.egg-info/
+*.egg
+.installed.cfg
+MANIFEST
+
+# ── Virtual environments ──────────────────────────────────────────────────────
+.venv/
+venv/
+ENV/
+env/
+.python-version
+.env
+
+# ── Training artifacts ────────────────────────────────────────────────────────
+# Run outputs from train.sh / veRL (Hydra writes ./outputs, veRL writes
+# ./checkpoints, our launchers write ./logs). None of this is committed.
+checkpoints/
+**/checkpoints/
+outputs/
+**/outputs/
+logs/
+results/
+ray_results/
+wandb/
+**/wandb/
+*.ckpt
+*.pt
+
+# ── Cluster job logs ──────────────────────────────────────────────────────────
+slurm-*.out
+lsf_logs/
+
+# ── Dataset artifacts ─────────────────────────────────────────────────────────
+# data/preprocess_*.py generate parquet shards (normally under ~/data, outside
+# the repo). Ignore any that land in-tree so raw datasets never get committed.
+*.parquet
+*.parquet.tmp
+data/*.json
+
+# ── HF / vLLM / misc caches ───────────────────────────────────────────────────
+hf_cache/
+.cache/
+.cache
+.hf_home/
+.triton/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# ── Notebooks ─────────────────────────────────────────────────────────────────
+.ipynb_checkpoints/
+# Local notebook generators (if regenerated) — the checked-in artifacts are the
+# .ipynb files, not builder scripts.
+notebooks/_build*.py
+
+# ── Internal dev notes + paper LaTeX source (not part of the public release) ───
+CLAUDE.md
+temp/
+# LaTeX build artifacts for the method figure (the committed artifact is
+# imgs/how_vpo_works.pdf, not the build dir).
+imgs/.texbuild/
+
+# ── Agent/session config ──────────────────────────────────────────────────────
+.claude/
+
+# ── OS / editor ───────────────────────────────────────────────────────────────
+.vscode/
+.idea/
+*.swp
+*~
+.DS_Store

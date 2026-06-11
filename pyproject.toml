@@ -1,0 +1,30 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "vpo"
+version = "0.1.0"
+description = "Vector Policy Optimization — a drop-in replacement for GRPO over vector-valued rewards."
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "Apache-2.0" }
+authors = [{ name = "Ryan Bahlous-Boldi" }]
+
+dependencies = [
+    "numpy",
+    "scipy",
+    "torch==2.9.0",
+    "transformers",
+    "datasets",
+    "ray",
+    "wandb",
+    "vllm==0.12.0",
+    "pyarrow",
+    "hydra-core",
+    "sympy",       # eureqa scoring
+]
+
+[tool.setuptools.packages.find]
+include = ["vpo*", "vpo_tasks*"]
+exclude = ["verl*", "data*", "eval*", "docs*", "imgs*"]
