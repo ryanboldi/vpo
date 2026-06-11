@@ -40,7 +40,7 @@ VPO doesn't change the optimizer, KL term, or rollout engine — only the advant
 
 ## What happens during one training step
 
-Tracing `train_vpo.sh TASK=maze`.
+Tracing `train.sh METHOD=vpo TASK=maze`.
 
 ### 1. Dataset emits a prompt
 
@@ -258,7 +258,7 @@ All env-var-controlled tunables.
 Any string after `KEY=VAL` env vars is forwarded to veRL verbatim, e.g.:
 
 ```bash
-bash train_vpo.sh TASK=maze ++trainer.test_freq=10 ++actor_rollout_ref.actor.optim.lr=5e-7
+bash train.sh METHOD=vpo TASK=maze ++trainer.test_freq=10 ++actor_rollout_ref.actor.optim.lr=5e-7
 ```
 
 Useful keys baked into `train.sh` you might want to override:

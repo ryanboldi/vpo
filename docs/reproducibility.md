@@ -44,7 +44,7 @@ uv venv .venv && source .venv/bin/activate
 cd verl && pip install -e . && cd ..   # the vendored, patched veRL
 pip install -e .                        # vpo + vpo_tasks
 python data/preprocess_<task>.py ...    # per-task flags in PAPER_REPRO §3
-bash train_<method>.sh TASK=<task> ...  # exact commands in PAPER_REPRO §3
+bash train.sh METHOD=<method> TASK=<task> ...  # exact commands in PAPER_REPRO §3
 ```
 
 ## Seeds and aggregation

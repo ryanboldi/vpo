@@ -5,9 +5,6 @@
 #   METHOD=vpo TASK=maze bash train.sh
 #   bash train.sh METHOD=vpo TASK=maze MODEL=Qwen/Qwen3-4B EPOCHS=50
 #
-# Or via a method-specific shim:
-#   bash train_vpo.sh TASK=maze
-#
 # Env knobs (all optional, sensible defaults):
 #   METHOD   grpo | gdpo | maxrl | multi_rlvr | vpo | goal_cond
 #            (also accepts vpo_single — the m=1 VPO estimator, used for lcb)
