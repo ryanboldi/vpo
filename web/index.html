@@ -45,24 +45,14 @@
   </p>
 </header>
 
-<h2>Abstract</h2>
+<h2>TL;DR</h2>
 <p>
-  Language models must now generalize out of the box to novel environments and work inside
-  inference-scaling search procedures, such as AlphaEvolve, that select rollouts with a variety of
-  task-specific reward functions. Unfortunately, the standard paradigm of LLM post-training optimizes
-  a pre-specified scalar reward, often leading current LLMs to produce low-entropy response
-  distributions and thus to struggle at displaying the diversity that inference-time search will
-  require. We propose <strong>Vector Policy Optimization (VPO)</strong>, an RL algorithm that
-  explicitly trains policies to anticipate diverse downstream reward functions and to produce diverse
-  solutions. VPO exploits that rewards are often vector-valued in practice, like per-test-case
-  correctness in code generation or multiple different user personas or reward models. VPO is
-  essentially a drop-in replacement for the GRPO advantage estimator, but it trains the LLM to output
-  a <em>set</em> of solutions where individual solutions specialize to different trade-offs in the
-  vector reward space. Across four tasks, VPO matches or beats the strongest scalar RL baselines on
-  test-time search (e.g. pass@<em>k</em> and best@<em>k</em>), with the gap widening as the search
-  budget grows. For evolutionary search, VPO models unlock problems that GRPO models cannot solve at
-  all. As test-time search becomes more standardized, optimizing for diversity may need to become the
-  default post-training objective.
+  Scalar RL post-training like GRPO collapses a model onto one high-probability answer, which is
+  exactly what hurts test-time search (best-of-<em>n</em>, verifier reranking, AlphaEvolve).
+  <strong>Vector Policy Optimization (VPO)</strong> keeps the reward a <em>vector</em> and trains the
+  model to emit a <em>set</em> of solutions that covers the reward space, so each member specializes
+  to a different trade-off. It's a drop-in replacement for the GRPO advantage estimator and improves
+  pass@<em>k</em> / best@<em>k</em>, with the gap widening as the search budget grows.
 </p>
 
 <figure>
@@ -214,15 +204,31 @@ cd verl &amp;&amp; pip install -e . &amp;&amp; cd .. &amp;&amp; pip install -e .
 python data/preprocess_maze.py --local_save_dir $HOME/data/maze
 bash train.sh METHOD=vpo TASK=maze MODEL=Qwen/Qwen3-4B</code></pre>
 
+<h2>Acknowledgments</h2>
+<p class="ack">
+  The authors express gratitude to Jyo Pari, Jonas H&uuml;botter, Nitish Dashora, Andre Ye,
+  Itamar Pres, Navodita Sharma, John Marangola, Nolan Fey, Oliver Sieberling, Linlu Qiu,
+  Luca Grillotti, Benjamin Eysenbach, Yoon Kim, Jacob Andreas, and members of the Improbable AI
+  lab at MIT for discussions that helped shape this work. This work was supported by National
+  Science Foundation graduate research fellowships to RB, IP, and AK, the MIT-IBM Computing
+  Research Lab, the MIT-Google Program for Computing Innovation and Hyundai Motor Company. This
+  research was sponsored by the Army Research Office and was accomplished under Grant Numbers
+  W911NF2110328 and W911NF-23-1-0277. The views and conclusions contained in this document are
+  those of the authors and should not be interpreted as representing the official policies,
+  either expressed or implied, of the Army Research Office or the U.S. Government. The U.S.
+  Government is authorized to reproduce and distribute reprints for Government purposes
+  notwithstanding any copyright notation herein.
+</p>
+
 <h2 id="bibtex">BibTeX</h2>
-<pre><code>@article{bahlousboldi2026vpo,
-  title  = {Vector Policy Optimization: Training for Diversity
-            Improves Test-Time Search},
-  author = {Bahlous-Boldi, Ryan and Puri, Isha and Shenfeld, Idan
-            and Kumar, Akarsh and Damani, Mehul and Risi, Sebastian
-            and Khattab, Omar and Hong, Zhang-Wei and Agrawal, Pulkit},
-  journal = {arXiv preprint arXiv:2605.22817},
-  year   = {2026}
+<pre><code>@misc{bahlousboldi2026vpo,
+  title={Vector Policy Optimization: Training for Diversity Improves Test-Time Search},
+  author={Ryan Bahlous-Boldi and Isha Puri and Idan Shenfeld and Akarsh Kumar and Mehul Damani and Sebastian Risi and Omar Khattab and Zhang-Wei Hong and Pulkit Agrawal},
+  year={2026},
+  eprint={2605.22817},
+  archivePrefix={arXiv},
+  primaryClass={cs.LG},
+  url={https://arxiv.org/abs/2605.22817},
 }</code></pre>
 
 <footer>
