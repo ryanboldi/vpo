@@ -104,7 +104,7 @@ case "$TASK" in
         if [[ "$METHOD" == "goal_cond" ]]; then
             PROMPT_LEN=1024; RESPONSE_LEN=512; GOAL_COND_DOM="eureqa"
         elif is_multi "$METHOD"; then
-            PROMPT_LEN=1024; RESPONSE_LEN=2048; MULTI_SOL_DOM="eureqa"; NUM_SOLUTIONS=5
+            PROMPT_LEN=1024; RESPONSE_LEN=2048; MULTI_SOL_DOM="eureqa"; NUM_SOLUTIONS=3
         else
             PROMPT_LEN=1024; RESPONSE_LEN=512
         fi ;;

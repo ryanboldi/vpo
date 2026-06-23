@@ -35,7 +35,7 @@ GOLD = "G"
 DIAMOND = "D"
 LAVA = "L"
 WALL = "#"
-BONUS = "B"  # stepping on a bonus cell grants a score multiplier (convex mode)
+BONUS = "B"  # advertised in the prompt as a score multiplier, but a distractor: no reward effect
 
 WALKABLE = {EMPTY, START, END, GOLD, DIAMOND, LAVA, BONUS}
 ITEMS = {GOLD, DIAMOND, LAVA, BONUS}
@@ -156,11 +156,13 @@ def _clamp(x):
 
 
 def score_trajectory(sim: dict, num_gold: int, num_diamond: int,
-                     num_lava: int, score_mode: str = "linear") -> list[float]:
-    """Return 4-dim reward vector. Zero vector if not reached_end.
+                     num_lava: int) -> list[float]:
+    """Return the 4-dim reward vector. Zero vector if not reached_end.
 
-    score_mode: "linear" (collected/total per dim) or "convex_bonus"
-    ((collected/total)**2 per dim, ×1.5 if any BONUS cell visited; clamped).
+    Linear item/safety fractions: completion is binary, gold/diamond are
+    collected/total, avoid_lava is 1 − stepped/total. The center BONUS tile is
+    advertised in the prompt as a multiplier but is a distractor with no reward
+    effect.
     """
     if not sim["reached_end"]:
         return list(ZERO_SCORES)
@@ -168,13 +170,6 @@ def score_trajectory(sim: dict, num_gold: int, num_diamond: int,
     gold_frac = (sim["gold"] / num_gold) if num_gold > 0 else 0.0
     diam_frac = (sim["diamond"] / num_diamond) if num_diamond > 0 else 0.0
     safe_frac = (1.0 - sim["lava"] / num_lava) if num_lava > 0 else 1.0
-
-    if score_mode == "convex_bonus":
-        mult = 1.5 if sim.get("bonus", 0) > 0 else 1.0
-        gold = mult * (gold_frac ** 2)
-        diamond = mult * (diam_frac ** 2)
-        avoid_lava = mult * (safe_frac ** 2)
-        return [1.0, _clamp(gold), _clamp(diamond), _clamp(avoid_lava)]
 
     return [1.0, _clamp(gold_frac), _clamp(diam_frac), _clamp(safe_frac)]
 
@@ -190,7 +185,6 @@ def score_route(response: str, gt: dict) -> list[float]:
     sim = simulate(grid, start, end, moves, gt["max_steps"])
     return score_trajectory(
         sim, gt["num_gold"], gt["num_diamond"], gt["num_lava"],
-        score_mode=gt.get("score_mode", "linear"),
     )
 
 
@@ -338,7 +332,7 @@ class MazeTask(Task):
         import pyarrow.parquet as pq
 
         os.makedirs(args.local_save_dir, exist_ok=True)
-        print(f"Generating maze (convex_bonus + 4-corner, {V8_GRID_SIZE}x{V8_GRID_SIZE}) ...")
+        print(f"Generating maze (linear reward + 4-corner, {V8_GRID_SIZE}x{V8_GRID_SIZE}) ...")
         train_rows = _make_split(args.train_size, args.train_seed)
         test_rows = _make_split(args.test_size, args.test_seed)
 
@@ -623,7 +617,6 @@ def _build_record(seed):
                 "max_steps": maze["max_steps"],
                 "num_gold": maze["num_gold"], "num_diamond": maze["num_diamond"],
                 "num_lava": maze["num_lava"],
-                "score_mode": "convex_bonus",
             },
         },
         "extra_info": {
