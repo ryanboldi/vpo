@@ -47,12 +47,18 @@
 
 <h2>TL;DR</h2>
 <p>
-  Scalar RL post-training like GRPO collapses a model onto one high-probability answer, which is
-  exactly what hurts test-time search (best-of-<em>n</em>, verifier reranking, AlphaEvolve).
-  <strong>Vector Policy Optimization (VPO)</strong> keeps the reward a <em>vector</em> and trains the
-  model to emit a <em>set</em> of solutions that covers the reward space, so each member specializes
-  to a different trade-off. It's a drop-in replacement for the GRPO advantage estimator and improves
-  pass@<em>k</em> / best@<em>k</em>, with the gap widening as the search budget grows.
+  Modern LLM pipelines rarely take a single answer. They sample many candidates and keep the best:
+  best-of-<em>n</em>, verifier reranking, evolutionary search like AlphaEvolve. This is
+  <strong>test-time search</strong>, and it only pays off if the candidates differ. GRPO works
+  against that. It collapses the model onto one high-probability answer, so the extra samples are
+  near-duplicates and search has nothing to choose between.
+</p>
+<p>
+  <strong>Vector Policy Optimization (VPO)</strong> keeps the reward a <em>vector</em>. Most rewards
+  already are vectors: several objectives summed into one score. VPO trains the model to emit a
+  <em>set</em> of solutions that spread across different trade-offs, so search gets distinct
+  candidates. It is a drop-in replacement for the GRPO advantage estimator. It improves
+  pass@<em>k</em> / best@<em>k</em>, and the gap grows as the search budget grows.
 </p>
 
 <figure>
@@ -203,6 +209,8 @@ cd verl &amp;&amp; pip install -e . &amp;&amp; cd .. &amp;&amp; pip install -e .
 
 python data/preprocess_maze.py --local_save_dir $HOME/data/maze
 bash train.sh METHOD=vpo TASK=maze MODEL=Qwen/Qwen3-4B</code></pre>
+<p class="repo-note"><small>Code released under Apache 2.0.
+<a href="https://github.com/ryanboldi/vpo">github.com/ryanboldi/vpo</a></small></p>
 
 <h2>Acknowledgments</h2>
 <p class="ack">
@@ -230,11 +238,6 @@ bash train.sh METHOD=vpo TASK=maze MODEL=Qwen/Qwen3-4B</code></pre>
   primaryClass={cs.LG},
   url={https://arxiv.org/abs/2605.22817},
 }</code></pre>
-
-<footer>
-  <p><small>Code released under Apache 2.0.
-  <a href="https://github.com/ryanboldi/vpo">github.com/ryanboldi/vpo</a></small></p>
-</footer>
 
 </body>
 </html>
