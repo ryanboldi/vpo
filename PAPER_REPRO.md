@@ -169,8 +169,35 @@ bash train.sh METHOD=vpo TASK=maze MODEL=Qwen/Qwen3-4B EPOCHS=2 SEED=0
 **Source.** MuSiQue-Ans via HuggingFace `dgslibisey/MuSiQue`;
 `data/preprocess_musique.py` uses the full train/validation splits
 (≈19.9k train / ≈2.4k validation; `--max_train/--max_test` to subsample).
-The paper reports best@k on a **300-question hop-stratified** held-out split
-(`eval/eval_musique.py --num-examples 300`).
+
+**Eval split (important — the released default is *not* stratified).** The paper
+reports best@k on a **300-question hop-stratified** held-out split. The released
+`eval/eval_musique.py --num-examples 300`, however, takes the **first 300 rows of
+`test.parquet`** (the validation split in its original HuggingFace order) — which
+is skewed toward 2-hop questions, not stratified. To reproduce the paper's split,
+rebuild `test.parquet` so the 300 questions are balanced across hop counts before
+running the eval. Each row carries its hop count in `extra_info.num_hops` (also
+encoded in the MuSiQue `id` prefix: `2hop__…`, `3hop__…`, `4hop__…`):
+
+```python
+import datasets
+
+ds = datasets.Dataset.from_parquet("~/data/musique/test.parquet")
+
+PER_HOP, SEED = 100, 42          # 100 each of 2/3/4-hop -> 300 total
+parts = []
+for h in (2, 3, 4):
+    bucket = ds.filter(lambda r: r["extra_info"]["num_hops"] == h)
+    bucket = bucket.shuffle(seed=SEED).select(range(min(PER_HOP, len(bucket))))
+    parts.append(bucket)
+
+datasets.concatenate_datasets(parts).shuffle(seed=SEED).to_parquet(
+    "~/data/musique/test.parquet")   # overwrite so the eval loads the stratified set
+```
+
+Then run `eval/eval_musique.py --num-examples 300` as usual; the `select(range(300))`
+now returns the full stratified set. (Stratification will be folded into
+`preprocess_musique.py` so it becomes the default.)
 
 **Reward vector (k = 5)** — `vpo_tasks/musique.py`:
 
