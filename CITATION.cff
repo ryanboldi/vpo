@@ -1,0 +1,56 @@
+cff-version: 1.2.0
+message: "If you use VPO, please cite the paper below."
+title: "VPO: Vector Policy Optimization"
+abstract: >-
+  A drop-in replacement for the GRPO advantage estimator that keeps the reward a
+  vector and trains the policy to emit a set of solutions spread across different
+  trade-offs, optimizing over randomly sampled weightings of the objectives.
+repository-code: "https://github.com/ryanboldi/vpo"
+url: "https://vpo-rl.github.io"
+license: Apache-2.0
+authors:
+  - family-names: Bahlous-Boldi
+    given-names: Ryan
+  - family-names: Puri
+    given-names: Isha
+  - family-names: Shenfeld
+    given-names: Idan
+  - family-names: Kumar
+    given-names: Akarsh
+  - family-names: Damani
+    given-names: Mehul
+  - family-names: Risi
+    given-names: Sebastian
+  - family-names: Khattab
+    given-names: Omar
+  - family-names: Hong
+    given-names: Zhang-Wei
+  - family-names: Agrawal
+    given-names: Pulkit
+preferred-citation:
+  type: article
+  title: "Vector Policy Optimization: Training for Diversity Improves Test-Time Search"
+  year: 2026
+  identifiers:
+    - type: other
+      value: "arXiv:2605.22817"
+  url: "https://arxiv.org/abs/2605.22817"
+  authors:
+    - family-names: Bahlous-Boldi
+      given-names: Ryan
+    - family-names: Puri
+      given-names: Isha
+    - family-names: Shenfeld
+      given-names: Idan
+    - family-names: Kumar
+      given-names: Akarsh
+    - family-names: Damani
+      given-names: Mehul
+    - family-names: Risi
+      given-names: Sebastian
+    - family-names: Khattab
+      given-names: Omar
+    - family-names: Hong
+      given-names: Zhang-Wei
+    - family-names: Agrawal
+      given-names: Pulkit
